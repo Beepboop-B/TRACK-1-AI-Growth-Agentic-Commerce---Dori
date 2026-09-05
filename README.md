@@ -1,4 +1,4 @@
-# A.M.E. - Autonomous Merchant Engine
+# A.M.E. - Autonomous Merchant Engine --- DORI 
 
 AI agents can discover products, but traditional merchant checkout is not agent-native. A.M.E. turns the merchant into an AI-transactable endpoint.
 
