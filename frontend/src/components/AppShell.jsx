@@ -26,6 +26,13 @@ export default function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
+  const [merchantEmail, setMerchantEmail] = useState(() => localStorage.getItem('merchantEmail') || '');
+  const handleEmailChange = (e) => {
+    const val = e.target.value;
+    setMerchantEmail(val);
+    localStorage.setItem('merchantEmail', val);
+  };
+
   const isDark = theme === 'dark';
   const surfaceClass = isDark ? 'bg-darkSurface border-darkBorder' : 'bg-lightSurface border-lightBorder';
   const t2Class = isDark ? 'text-darkText2' : 'text-lightText2';
@@ -53,6 +60,20 @@ export default function AppShell() {
           <NavItem to="/transactions" icon={List} label="Transactions" collapsed={collapsed} />
           <NavItem to="/demo" icon={Play} label="Demo" collapsed={collapsed} />
         </nav>
+        <div className={`px-4 py-3 border-t ${isDark ? 'border-darkBorder' : 'border-lightBorder'}`}>
+          {!collapsed && (
+            <div>
+              <label className={`block text-[10px] uppercase font-bold mb-1.5 ${t2Class}`}>Merchant Contact</label>
+              <input 
+                type="email" 
+                value={merchantEmail} 
+                onChange={handleEmailChange}
+                placeholder="Approval email..."
+                className={`w-full px-2 py-1.5 rounded text-sm bg-transparent border focus:outline-none focus:border-amber transition-colors ${isDark ? 'border-darkBorder text-darkText1 focus:bg-darkSurfaceEl' : 'border-lightBorder text-lightText1 focus:bg-lightSurfaceEl'}`}
+              />
+            </div>
+          )}
+        </div>
         <div className={`p-4 text-xs font-semibold ${t2Class} text-center`}>
           {!collapsed && 'Powered by Razorpay'}
         </div>
@@ -81,6 +102,18 @@ export default function AppShell() {
           <NavItem to="/transactions" icon={List} label="Transactions" onClick={() => setMobileMenuOpen(false)} />
           <NavItem to="/demo" icon={Play} label="Demo" onClick={() => setMobileMenuOpen(false)} />
         </nav>
+        <div className={`px-4 py-4 border-t ${isDark ? 'border-darkBorder' : 'border-lightBorder'}`}>
+          <div>
+            <label className={`block text-[10px] uppercase font-bold mb-1.5 ${t2Class}`}>Merchant Contact</label>
+            <input 
+              type="email" 
+              value={merchantEmail} 
+              onChange={handleEmailChange}
+              placeholder="Approval email..."
+              className={`w-full px-2 py-2 rounded text-sm bg-transparent border focus:outline-none focus:border-amber transition-colors ${isDark ? 'border-darkBorder text-darkText1 focus:bg-darkSurfaceEl' : 'border-lightBorder text-lightText1 focus:bg-lightSurfaceEl'}`}
+            />
+          </div>
+        </div>
       </aside>
 
       {/* Main Content */}

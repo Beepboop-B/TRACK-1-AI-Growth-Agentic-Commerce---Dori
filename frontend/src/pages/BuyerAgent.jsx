@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { submitIntent, negotiate, checkPaymentStatus, getCatalog, getAuthStatus, updateAuthStatus } from '../api/client';
+import { submitIntent, negotiate, checkPaymentStatus, getCatalog, getAuthStatus, updateAuthStatus, sendApprovalEmail } from '../api/client';
 import { fmtInr, fmtPct } from '../utils/format';
 
 const PipelineStage = ({ label, active, color }) => {
@@ -108,8 +108,21 @@ export default function BuyerAgent() {
     setLoading(false);
   };
   
-  const handleApprovePhone = () => {
+  const handleApprovePhone = async () => {
     setMerchantAuth('PHONE_PENDING');
+    setEmailStatus('SENDING');
+    const merchantEmail = localStorage.getItem('merchantEmail');
+    if (merchantEmail && merchantEmail.includes('@')) {
+      try {
+        await sendApprovalEmail(response.transaction_id, merchantEmail);
+        setEmailStatus('SENT');
+      } catch (err) {
+        console.error(err);
+        setEmailStatus('FAILED');
+      }
+    } else {
+      setEmailStatus('FAILED');
+    }
   };
 
   useEffect(() => {

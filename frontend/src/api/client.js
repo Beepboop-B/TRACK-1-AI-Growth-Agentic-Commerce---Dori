@@ -40,3 +40,8 @@ export const updateAuthStatus = async (token, action, device) => {
   const res = await api.post(`/agent/authorization/${token}`, { action, device });
   return res.data;
 };
+
+export const sendApprovalEmail = async (token, email) => {
+  const res = await api.post(`/agent/authorization/${token}/email`, { email });
+  return res.data;
+};

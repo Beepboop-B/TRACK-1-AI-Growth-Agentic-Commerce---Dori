@@ -113,6 +113,9 @@ class AuthRequest(BaseModel):
     action: str
     device: str
 
+class EmailRequest(BaseModel):
+    email: str
+
 def razorpay_credentials():
     key_id = os.getenv("RAZORPAY_KEY_ID")
     key_secret = os.getenv("RAZORPAY_KEY_SECRET")
@@ -466,7 +469,60 @@ def update_auth_status(token: str, req: AuthRequest):
     else:
         return {"status": "NO_UPDATE_NEEDED"}
 
+
+@app.post("/agent/authorization/{token}/email")
+def send_authorization_email(token: str, req: EmailRequest):
+    transactions = load_transactions()
+    tx = next((t for t in transactions if t.get("transaction_id") == token), None)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    if not resend_api_key:
+        raise HTTPException(status_code=500, detail="Email service not configured (RESEND_API_KEY missing).")
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://track-1-ai-growth-agentic-commerce.vercel.app")
+    approval_link = f"{frontend_url}/approval/{token}"
+
+    html_content = f"""
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #24201B;">
+        <h2 style="color: #D99A3D;">A.M.E. &mdash; Merchant Authorization Required</h2>
+        <p>A new transaction has been negotiated and requires your authorization.</p>
+        <div style="background-color: #F3E9D5; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+            <p style="margin: 4px 0;"><strong>Product:</strong> {tx.get('requested_quantity')} x {tx.get('sku')}</p>
+            <p style="margin: 4px 0;"><strong>Negotiated Unit Price:</strong> INR {tx.get('negotiated_unit_price')}</p>
+            <p style="margin: 4px 0;"><strong>Discount:</strong> {tx.get('requested_discount_pct')}%</p>
+            <p style="margin: 4px 0;"><strong>Transaction Value:</strong> INR {tx.get('total_negotiated_price_inr')}</p>
+            <p style="margin: 4px 0;"><strong>Policy Status:</strong> {tx.get('status')} (Autonomous Check Passed)</p>
+        </div>
+        <p style="font-size: 0.9em; color: #666;">This action authorizes the merchant transaction. Payment is completed separately through Razorpay.</p>
+        <a href="{approval_link}" style="display: inline-block; background-color: #24201B; color: #F3E9D5; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 6px; margin-top: 16px;">REVIEW & APPROVE ON PHONE</a>
+    </div>
+    """
+
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": "A.M.E. Merchant <onboarding@resend.dev>",
+                "to": req.email,
+                "subject": "A.M.E. — Merchant Authorization Required",
+                "html": html_content
+            },
+            timeout=10
+        )
+        response.raise_for_status()
+        return {"status": "EMAIL_SENT"}
+    except requests.exceptions.RequestException as e:
+        detail = e.response.text if e.response is not None else str(e)
+        raise HTTPException(status_code=502, detail=f"Failed to send email: {detail}")
+
 @app.get("/agent/payment-status/{order_id}")
+
 
 def get_payment_status(order_id: str):
     """
