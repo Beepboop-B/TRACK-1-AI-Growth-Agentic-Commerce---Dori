@@ -6,6 +6,7 @@ import CommandCenter from './pages/CommandCenter';
 import BuyerAgent from './pages/BuyerAgent';
 import Transactions from './pages/Transactions';
 import Demo from './pages/Demo';
+import Catalog from './pages/Catalog';
 import PhoneApproval from './pages/PhoneApproval';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
             <Route index element={<CommandCenter />} />
             <Route path="buyer" element={<BuyerAgent />} />
             <Route path="transactions" element={<Transactions />} />
+            <Route path="catalog" element={<Catalog />} />
             <Route path="demo" element={<Demo />} />
           </Route>
           <Route path="/approval/:token" element={<PhoneApproval />} />

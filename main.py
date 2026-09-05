@@ -296,34 +296,42 @@ def negotiate_deal(req: NegotiationRequest):
         None,
     )
 
-    if not product:
-        return {
+    tx_id = str(uuid.uuid4())
+    
+    def reject_transaction(reason_str):
+        tx_record = {
+            "transaction_id": tx_id,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "sku": req.sku,
+            "requested_quantity": req.requested_quantity,
+            "requested_discount_pct": req.requested_discount_pct,
             "status": "REJECTED",
-            "reason": "SKU not found in catalog.",
+            "negotiated_unit_price": 0,
+            "total_negotiated_price_inr": 0,
+            "razorpay_order_id": None,
+            "merchant_auth": None,
+            "auth_device": None,
+            "reason": reason_str
+        }
+        save_transaction(tx_record)
+        return {
+            "transaction_id": tx_id,
+            "status": "REJECTED",
+            "reason": reason_str,
             "policy_version": POLICY_VERSION,
             "decision_timestamp": datetime.utcnow().isoformat() + "Z",
         }
 
+    if not product:
+        return reject_transaction("SKU not found in catalog.")
+
     if req.requested_quantity <= 0:
-        return {
-            "status": "REJECTED",
-            "reason": "Requested quantity must be at least 1.",
-            "policy_version": POLICY_VERSION,
-            "decision_timestamp": datetime.utcnow().isoformat() + "Z",
-        }
+        return reject_transaction("Requested quantity must be at least 1.")
 
     stock = product.get("stock", 0)
 
     if req.requested_quantity > stock:
-        return {
-            "status": "REJECTED",
-            "reason": (
-                f"Out of stock. Requested {req.requested_quantity}, "
-                f"available {stock}."
-            ),
-            "policy_version": POLICY_VERSION,
-            "decision_timestamp": datetime.utcnow().isoformat() + "Z",
-        }
+        return reject_transaction(f"Out of stock. Requested {req.requested_quantity}, available {stock}.")
 
     max_disc = float(product.get("max_discount_pct", 0))
 
@@ -334,13 +342,15 @@ def negotiate_deal(req: NegotiationRequest):
             "Autonomous agent check passed: requested discount is within "
             "acceptable merchant bounds."
         )
-    else:
+    elif req.requested_discount_pct <= max_disc + 10:
         status = "COUNTER_OFFER"
         granted_disc = max_disc
         reason = (
             f"Counter-offer: requested discount exceeds limit. "
             f"Capped at max allowed {max_disc}%."
         )
+    else:
+        return reject_transaction(f"Requested discount {req.requested_discount_pct}% strictly violates merchant policy. Maximum allowed is {max_disc}%.")
 
     base_price = float(product.get("base_price_inr", 0))
     discounted_unit_price = base_price * (1 - (granted_disc / 100))
@@ -385,7 +395,6 @@ def negotiate_deal(req: NegotiationRequest):
                 "offered_price_inr": round(cross_sell_price, 2),
             }
 
-    tx_id = str(uuid.uuid4())
     tx_record = {
         "transaction_id": tx_id,
         "timestamp": datetime.utcnow().isoformat() + "Z",

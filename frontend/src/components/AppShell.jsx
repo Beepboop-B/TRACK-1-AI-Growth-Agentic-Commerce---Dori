@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { Moon, Sun, LayoutDashboard, ShoppingCart, List, Play, Menu, X } from 'lucide-react';
+import { Moon, Sun, LayoutDashboard, ShoppingCart, List, Play, Menu, X, ShoppingBag } from 'lucide-react';
 
-const NavItem = ({ to, icon: Icon, label, collapsed, onClick }) => {
+const NavItem = ({ to, icon: Icon, label, collapsed, onClick, disabled }) => {
   const { theme } = useTheme();
   return (
     <NavLink
-      to={to}
-      onClick={onClick}
+      to={disabled ? '#' : to}
+      onClick={(e) => {
+        if (disabled) {
+          e.preventDefault();
+          return;
+        }
+        if (onClick) onClick();
+      }}
       className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 mb-1 rounded-lg transition-colors ${
-        isActive 
+        disabled ? 'opacity-50 cursor-not-allowed grayscale' :
+        (isActive && !disabled)
           ? (theme === 'dark' ? 'bg-amberSoft text-amber font-bold' : 'bg-lightAmberSoft text-lightAmber font-bold') 
           : (theme === 'dark' ? 'text-darkText2 hover:bg-darkSurfaceEl' : 'text-lightText2 hover:bg-lightSurfaceEl')
       }`}
@@ -27,6 +34,16 @@ export default function AppShell() {
   const { theme, toggleTheme } = useTheme();
 
   const [merchantEmail, setMerchantEmail] = useState(() => localStorage.getItem('merchantEmail') || '');
+  const [paymentActive, setPaymentActive] = useState(() => localStorage.getItem('paymentActive') === 'true');
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setPaymentActive(localStorage.getItem('paymentActive') === 'true');
+    };
+    window.addEventListener('paymentActiveChange', handleStorage);
+    return () => window.removeEventListener('paymentActiveChange', handleStorage);
+  }, []);
+
   const handleEmailChange = (e) => {
     const val = e.target.value;
     setMerchantEmail(val);
@@ -54,53 +71,12 @@ export default function AppShell() {
           </button>
         </div>
         <hr className={`border-t ${isDark ? 'border-darkBorder' : 'border-lightBorder'} mb-4`} />
-        <nav className="flex-1 px-3">
-          <NavItem to="/" icon={LayoutDashboard} label="Command Center" collapsed={collapsed} />
-          <NavItem to="/buyer" icon={ShoppingCart} label="Buyer Agent" collapsed={collapsed} />
-          <NavItem to="/transactions" icon={List} label="Transactions" collapsed={collapsed} />
-          <NavItem to="/demo" icon={Play} label="Demo" collapsed={collapsed} />
-        </nav>
-        <div className={`px-4 py-3 border-t ${isDark ? 'border-darkBorder' : 'border-lightBorder'}`}>
-          {!collapsed && (
-            <div>
-              <label className={`block text-[10px] uppercase font-bold mb-1.5 ${t2Class}`}>Merchant Contact</label>
-              <input 
-                type="email" 
-                value={merchantEmail} 
-                onChange={handleEmailChange}
-                placeholder="Approval email..."
-                className={`w-full px-2 py-1.5 rounded text-sm bg-transparent border focus:outline-none focus:border-amber transition-colors ${isDark ? 'border-darkBorder text-darkText1 focus:bg-darkSurfaceEl' : 'border-lightBorder text-lightText1 focus:bg-lightSurfaceEl'}`}
-              />
-            </div>
-          )}
-        </div>
-        <div className={`p-4 text-xs font-semibold ${t2Class} text-center`}>
-          {!collapsed && 'Powered by Razorpay'}
-        </div>
-      </aside>
-
-      {/* Mobile Drawer Overlay */}
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-      )}
-
-      {/* Mobile Drawer */}
-      <aside className={`md:hidden fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 flex flex-col ${surfaceClass} ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-4 flex items-center justify-between">
-          <div>
-            <h2 className={`font-extrabold text-xl tracking-tight ${t1Class}`}>A.M.E.</h2>
-            <p className={`text-[10px] uppercase tracking-wider ${t2Class}`}>Agentic Merchant Engine</p>
-          </div>
-          <button onClick={() => setMobileMenuOpen(false)} className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${t2Class}`}>
-            <X size={20} />
-          </button>
-        </div>
-        <hr className={`border-t ${isDark ? 'border-darkBorder' : 'border-lightBorder'} mb-4`} />
-        <nav className="flex-1 px-3">
-          <NavItem to="/" icon={LayoutDashboard} label="Command Center" onClick={() => setMobileMenuOpen(false)} />
-          <NavItem to="/buyer" icon={ShoppingCart} label="Buyer Agent" onClick={() => setMobileMenuOpen(false)} />
-          <NavItem to="/transactions" icon={List} label="Transactions" onClick={() => setMobileMenuOpen(false)} />
-          <NavItem to="/demo" icon={Play} label="Demo" onClick={() => setMobileMenuOpen(false)} />
+                                        <nav className="flex-1 px-3">
+          <NavItem to="/" icon={LayoutDashboard} label="Command Center" onClick={() => setMobileMenuOpen(false)} disabled={paymentActive} />
+          <NavItem to="/buyer" icon={ShoppingCart} label="Buyer Agent" onClick={() => setMobileMenuOpen(false)} disabled={paymentActive} />
+          <NavItem to="/catalog" icon={ShoppingBag} label="Catalog" onClick={() => setMobileMenuOpen(false)} disabled={paymentActive} />
+          <NavItem to="/transactions" icon={List} label="Transactions" onClick={() => setMobileMenuOpen(false)} disabled={paymentActive} />
+          <NavItem to="/demo" icon={Play} label="Demo" onClick={() => setMobileMenuOpen(false)} disabled={paymentActive} />
         </nav>
         <div className={`px-4 py-4 border-t ${isDark ? 'border-darkBorder' : 'border-lightBorder'}`}>
           <div>
@@ -119,6 +95,11 @@ export default function AppShell() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative z-0">
         {/* TopBar */}
+                {paymentActive && (
+          <div className="bg-amber text-black text-xs font-bold text-center py-1 tracking-widest z-50 shadow-md">
+            PAYMENT IN PROGRESS — NAVIGATION DISABLED
+          </div>
+        )}
         <header className="px-4 md:px-8 py-4 md:py-6 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileMenuOpen(true)} className={`md:hidden p-2 -ml-2 rounded hover:bg-black/10 dark:hover:bg-white/10 ${t1Class}`}>

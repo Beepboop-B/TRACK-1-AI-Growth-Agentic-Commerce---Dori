@@ -45,7 +45,12 @@ export default function BuyerAgent() {
   const [catalog, setCatalog] = useState([]);
 
   // States
-  const [query, setQuery] = useState("Find me 5 Pro Licenses under ₹9,500 and buy them.");
+  const [query, setQuery] = useState(searchParams.get('q') || "Find me 5 Pro Licenses under ₹9,500 and buy them.");
+  
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) setQuery(q);
+  }, [searchParams]);
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
   
@@ -159,6 +164,8 @@ export default function BuyerAgent() {
         rzp.on('payment.failed', function (resp) {
           setPaymentError(resp.error.description);
         });
+        localStorage.setItem('paymentActive', 'true');
+        window.dispatchEvent(new Event('paymentActiveChange'));
         rzp.open();
         resolve(true);
       };
@@ -184,13 +191,23 @@ export default function BuyerAgent() {
         checkPaymentStatus(orderId).then(data => {
           setPaymentStatus(data);
           setLoading(false);
+          localStorage.setItem('paymentActive', 'false');
+          window.dispatchEvent(new Event('paymentActiveChange'));
         }).catch(err => {
           console.error(err);
           setPaymentError("Verification failed.");
           setLoading(false);
+          localStorage.setItem('paymentActive', 'false');
+          window.dispatchEvent(new Event('paymentActiveChange'));
         });
       },
-      theme: { color: "#D99A3D" }
+      theme: { color: "#D99A3D" },
+      modal: {
+        ondismiss: function() {
+          localStorage.setItem('paymentActive', 'false');
+          window.dispatchEvent(new Event('paymentActiveChange'));
+        }
+      }
     };
     loadRazorpay(options);
   };
