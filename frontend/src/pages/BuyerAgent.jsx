@@ -57,6 +57,7 @@ export default function BuyerAgent() {
   const [paymentStatus, setPaymentStatus] = useState(null); // Razorpay status response
   const [paymentError, setPaymentError] = useState(null);
   const [authDevice, setAuthDevice] = useState(null); // 'Desktop' or 'Phone'
+  const [emailStatus, setEmailStatus] = useState(null); // 'SENDING', 'SENT', 'FAILED'
 
   useEffect(() => {
     getCatalog().then(setCatalog).catch(console.error);
