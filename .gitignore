@@ -25,3 +25,4 @@ Thumbs.db
 
 # Project Specific
 transactions.json
+frontend/node_modules/
