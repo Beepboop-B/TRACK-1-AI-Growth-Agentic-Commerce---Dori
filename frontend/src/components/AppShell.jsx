@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Moon, Sun, LayoutDashboard, ShoppingCart, List, Play, Menu, X, ShoppingBag } from 'lucide-react';
