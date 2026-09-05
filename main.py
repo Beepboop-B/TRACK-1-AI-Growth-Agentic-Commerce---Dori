@@ -276,8 +276,111 @@ def parse_buyer_intent(req: IntentRequest):
 def get_transactions():
     return load_transactions()
 
-@app.post("/agent/respond-to-counter")
-def respond_to_counter(req: CounterOfferRequest):
+@app.post("/agent/negotiate")
+def negotiate_deal(req: NegotiationRequest):
+    """
+    Merchant Agent endpoint:
+    - validates SKU
+    - checks inventory
+    - evaluates discount policy
+    - calculates negotiated price
+    - attempts a REAL Razorpay TEST-MODE order
+    - never blocks longer than the Razorpay request timeout
+    """
+
+    product = next(
+        (p for p in catalog.get("products", []) if p.get("sku") == req.sku),
+        None,
+    )
+
+    if not product:
+        return {
+            "status": "REJECTED",
+            "reason": "SKU not found in catalog.",
+            "policy_version": POLICY_VERSION,
+            "decision_timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+    if req.requested_quantity <= 0:
+        return {
+            "status": "REJECTED",
+            "reason": "Requested quantity must be at least 1.",
+            "policy_version": POLICY_VERSION,
+            "decision_timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+    stock = product.get("stock", 0)
+
+    if req.requested_quantity > stock:
+        return {
+            "status": "REJECTED",
+            "reason": (
+                f"Out of stock. Requested {req.requested_quantity}, "
+                f"available {stock}."
+            ),
+            "policy_version": POLICY_VERSION,
+            "decision_timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+    max_disc = float(product.get("max_discount_pct", 0))
+
+    if req.requested_discount_pct <= max_disc:
+        status = "ACCEPTED"
+        granted_disc = float(req.requested_discount_pct)
+        reason = (
+            "Autonomous agent check passed: requested discount is within "
+            "acceptable merchant bounds."
+        )
+    else:
+        status = "COUNTER_OFFER"
+        granted_disc = max_disc
+        reason = (
+            f"Counter-offer: requested discount exceeds limit. "
+            f"Capped at max allowed {max_disc}%."
+        )
+
+    base_price = float(product.get("base_price_inr", 0))
+    discounted_unit_price = base_price * (1 - (granted_disc / 100))
+    total_price = discounted_unit_price * req.requested_quantity
+    amount_paise = int(round(total_price * 100))
+
+    razorpay_order_id, razorpay_key_id, payment_error = create_razorpay_order(
+        amount_paise=amount_paise,
+        sku=req.sku,
+        quantity=req.requested_quantity,
+        negotiation_status=status,
+    )
+
+    response = {
+        "status": status,
+        "negotiated_unit_price": round(discounted_unit_price, 2),
+        "total_negotiated_price_inr": round(total_price, 2),
+        "discount_granted_pct": granted_disc,
+        "reason": reason,
+        "razorpay_order_id": razorpay_order_id,
+        "amount_paise": amount_paise,
+        "razorpay_key_id": razorpay_key_id,
+        "payment_error": payment_error,
+        "policy_version": POLICY_VERSION,
+        "decision_timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+    cross_sell_sku = product.get("cross_sell_sku")
+    if cross_sell_sku:
+        cross_sell_product = next(
+            (p for p in catalog.get("products", []) if p.get("sku") == cross_sell_sku),
+            None,
+        )
+        if cross_sell_product:
+            cross_sell_base_price = float(cross_sell_product.get("base_price_inr", 0))
+            cross_sell_price = cross_sell_base_price * (1 - granted_disc / 100)
+            response["cross_sell"] = {
+                "sku": cross_sell_product["sku"],
+                "name": cross_sell_product["name"],
+                "base_price_inr": cross_sell_product["base_price_inr"],
+                "offered_discount_pct": granted_disc,
+                "offered_price_inr": round(cross_sell_price, 2),
+            }
 
     tx_id = str(uuid.uuid4())
     tx_record = {
@@ -298,6 +401,22 @@ def respond_to_counter(req: CounterOfferRequest):
     response["transaction_id"] = tx_id
     response["merchant_auth"] = None
     return response
+
+@app.post("/agent/respond-to-counter")
+def respond_to_counter(req: CounterOfferRequest):
+    tx_record = {
+        "transaction_id": str(uuid.uuid4()),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "razorpay_order_id": req.razorpay_order_id,
+        "sku": req.sku,
+        "action": req.buyer_decision
+    }
+    save_transaction(tx_record)
+    
+    if req.buyer_decision == "ACCEPT_COUNTER":
+        return {"status": "DEAL_ACCEPTED", "razorpay_order_id": req.razorpay_order_id}
+    else:
+        return {"status": "CANCELLED", "razorpay_order_id": req.razorpay_order_id}
 
 
 
