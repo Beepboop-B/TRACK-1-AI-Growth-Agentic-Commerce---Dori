@@ -22,18 +22,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="A.M.E. - Agentic Merchant Engine")
 
-import os
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    frontend_url
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "https://track-1-ai-growth-agentic-commerce.vercel.app",
+        "http://localhost:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
