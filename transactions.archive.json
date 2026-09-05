@@ -1,0 +1,41 @@
+[
+  {
+    "transaction_id": "d6f23927-ff62-406e-bee6-d0e70b1888a6",
+    "timestamp": "2026-09-03T11:56:38.776590Z",
+    "sku": "SaaS-PRO-1M",
+    "requested_quantity": 5,
+    "requested_discount_pct": 5.0,
+    "status": "PAID",
+    "negotiated_unit_price": 1900.0,
+    "total_negotiated_price_inr": 9500.0,
+    "razorpay_order_id": "order_demo_1",
+    "merchant_auth": "APPROVED",
+    "auth_device": "Desktop"
+  },
+  {
+    "transaction_id": "6e2950ca-1fd6-4113-abc0-b7e8a809f729",
+    "timestamp": "2026-09-04T23:56:38.776590Z",
+    "sku": "SaaS-PRO-1M",
+    "requested_quantity": 10,
+    "requested_discount_pct": 25.0,
+    "status": "REJECTED",
+    "negotiated_unit_price": 0,
+    "total_negotiated_price_inr": 0,
+    "razorpay_order_id": null,
+    "merchant_auth": "DECLINED",
+    "auth_device": "Desktop"
+  },
+  {
+    "transaction_id": "5f2ee09d-e4e4-469c-a6d6-246fff3f6fb7",
+    "timestamp": "2026-09-05T09:56:38.776590Z",
+    "sku": "API-CRED-10K",
+    "requested_quantity": 2,
+    "requested_discount_pct": 5.0,
+    "status": "PAID",
+    "negotiated_unit_price": 475.0,
+    "total_negotiated_price_inr": 950.0,
+    "razorpay_order_id": "order_demo_3",
+    "merchant_auth": "APPROVED",
+    "auth_device": "Phone"
+  }
+]

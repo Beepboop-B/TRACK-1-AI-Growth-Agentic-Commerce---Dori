@@ -1,0 +1,1105 @@
+﻿import os
+import time
+from datetime import datetime
+
+import requests
+import streamlit as st
+import streamlit.components.v1 as components
+
+st.set_page_config(
+    page_title="A.M.E. // Agentic Merchant Engine", layout="wide"
+)
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# ============================================================================
+# DESIGN TOKENS
+# Near-black / charcoal base, high-contrast white text, muted gray secondary
+# text, and a small restrained set of semantic colors. One accent color used
+# sparingly for interactive / in-progress states â€” not a decoration color.
+# ============================================================================
+st.markdown(
+    """
+    <style>
+    :root {
+        --ame-bg:        #0D0B08;
+        --ame-surface:   #1A1713;
+        --ame-surface-2: #24201B;
+        --ame-border:    rgba(255,255,255,0.10);
+        --ame-border-2:  rgba(255,255,255,0.16);
+        --ame-text:      #F3E9D5;
+        --ame-text-muted:#9A9AA0;
+        --ame-text-faint:#5C5C63;
+        --ame-accent:    #D99A3D;
+        --ame-accent-dim:rgba(92,124,250,0.14);
+        --ame-success:   #2FB673;
+        --ame-success-dim: rgba(47,182,115,0.12);
+        --ame-warning:   #E0A83E;
+        --ame-warning-dim: rgba(224,168,62,0.12);
+        --ame-error:     #E5584C;
+        --ame-error-dim: rgba(229,88,76,0.12);
+        --ame-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        --ame-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .block-container { padding-top: 5rem; padding-bottom: 2.5rem; max-width: 1360px; overflow-x: hidden; }
+    section.main { overflow-x: hidden; }
+    [data-testid="stSidebar"] { border-right: 1px solid var(--ame-border); }
+
+    /* ---------- Header ---------- */
+    .ame-header-title {
+        font-family: var(--ame-sans);
+        font-size: 1.7rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--ame-text);
+        margin: 0 0 4px 0;
+        line-height: 1.25;
+    }
+    .ame-header-sub {
+        font-size: 0.92rem;
+        color: var(--ame-text-muted);
+        margin: 0;
+        line-height: 1.4;
+    }
+    .ame-status-pill-row {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 10px;
+    }
+    .ame-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--ame-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        color: var(--ame-text-muted);
+        border: 1px solid var(--ame-border);
+        border-radius: 4px;
+        padding: 6px 11px;
+        white-space: nowrap;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .ame-header-rule {
+        border-bottom: 1px solid var(--ame-border);
+        margin: 12px 0 16px 0;
+    }
+    .ame-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .ame-dot.online { background: var(--ame-success); }
+    .ame-dot.offline { background: var(--ame-error); }
+
+    /* ---------- Transaction rail ---------- */
+    .ame-rail {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0;
+        padding: 4px 2px 20px 2px;
+    }
+    .ame-rail-item { display: flex; align-items: center; gap: 8px; }
+    .ame-rail-dot {
+        width: 9px; height: 9px; border-radius: 50%;
+        border: 1.5px solid var(--ame-text-faint);
+        background: transparent;
+        flex-shrink: 0;
+    }
+    .ame-rail-item.is-done .ame-rail-dot { background: var(--ame-success); border-color: var(--ame-success); }
+    .ame-rail-item.is-current .ame-rail-dot { background: var(--ame-accent); border-color: var(--ame-accent); }
+    .ame-rail-item.is-failed .ame-rail-dot { background: var(--ame-error); border-color: var(--ame-error); }
+    .ame-rail-item.is-future .ame-rail-dot { border-color: var(--ame-text-faint); }
+    .ame-rail-label {
+        font-family: var(--ame-mono);
+        font-size: 0.74rem;
+        letter-spacing: 0.05em;
+        color: var(--ame-text-faint);
+    }
+    .ame-rail-item.is-done .ame-rail-label { color: var(--ame-text-muted); }
+    .ame-rail-item.is-current .ame-rail-label { color: var(--ame-text); font-weight: 600; }
+    .ame-rail-item.is-failed .ame-rail-label { color: var(--ame-error); font-weight: 600; }
+    .ame-rail-arrow { color: var(--ame-text-faint); font-size: 0.8rem; margin: 0 12px; }
+
+    /* ---------- Generic panel ---------- */
+    .ame-panel {
+        border: 1px solid var(--ame-border);
+        border-radius: 8px;
+        background: var(--ame-surface);
+        padding: 16px 18px;
+        margin-bottom: 12px;
+    }
+    .ame-panel-title {
+        font-family: var(--ame-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+        color: var(--ame-text-faint);
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+
+    /* ---------- Status badge ---------- */
+    .ame-status-badge {
+        border-left: 3px solid var(--ame-text-faint);
+        background: var(--ame-surface);
+        padding: 10px 14px;
+        margin-bottom: 12px;
+        border-radius: 0 6px 6px 0;
+    }
+    .ame-status-badge.ok { border-left-color: var(--ame-success); }
+    .ame-status-badge.warn { border-left-color: var(--ame-warning); }
+    .ame-status-badge.bad { border-left-color: var(--ame-error); }
+    .ame-status-badge .primary {
+        font-size: 0.95rem; font-weight: 700; color: var(--ame-text);
+        letter-spacing: 0.01em;
+    }
+    .ame-status-badge .secondary {
+        font-family: var(--ame-mono);
+        font-size: 0.72rem; letter-spacing: 0.04em;
+        color: var(--ame-text-muted); margin-top: 2px;
+    }
+
+    /* ---------- Live deal summary ---------- */
+    .ame-deal-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .ame-deal-item { min-width: 90px; }
+    .ame-deal-item .k { font-size: 0.66rem; letter-spacing: 0.06em; color: var(--ame-text-faint); font-weight: 700; }
+    .ame-deal-item .v { font-size: 1.05rem; font-weight: 700; color: var(--ame-text); }
+    .ame-deal-item .v.strike { color: var(--ame-text-faint); font-weight: 500; text-decoration: line-through; font-size: 0.9rem; }
+    .ame-deal-item .v.save { color: var(--ame-success); }
+    .ame-deal-arrow { color: var(--ame-text-faint); }
+
+    /* ---------- Negotiation hero ---------- */
+    .ame-nego-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--ame-border);
+    }
+    .ame-nego-row:last-of-type { border-bottom: none; }
+    .ame-nego-label {
+        font-family: var(--ame-mono);
+        font-size: 0.7rem; letter-spacing: 0.05em;
+        color: var(--ame-text-faint); font-weight: 700;
+    }
+    .ame-nego-value { font-size: 0.95rem; font-weight: 600; color: var(--ame-text); }
+    .ame-nego-value.ok { color: var(--ame-success); }
+    .ame-nego-value.warn { color: var(--ame-warning); }
+    .ame-nego-final {
+        margin-top: 10px; padding-top: 12px;
+        border-top: 1px solid var(--ame-border-2);
+        display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .ame-nego-final .label { font-family: var(--ame-mono); font-size: 0.7rem; color: var(--ame-text-faint); letter-spacing: 0.05em; }
+    .ame-nego-final .price { font-size: 1.55rem; font-weight: 700; color: var(--ame-text); }
+    .ame-nego-final .total { font-size: 0.82rem; color: var(--ame-text-muted); margin-top: 2px; }
+
+    /* ---------- Policy bar ---------- */
+    .ame-policy-bar-wrap { margin: 10px 0 4px 0; }
+    .ame-policy-bar-track {
+        position: relative; height: 7px; border-radius: 4px;
+        background: rgba(255,255,255,0.06); overflow: visible;
+    }
+    .ame-policy-bar-fill {
+        position: absolute; top: 0; left: 0; height: 100%; border-radius: 4px;
+    }
+    .ame-policy-bar-fill.ok { background: var(--ame-success); }
+    .ame-policy-bar-fill.exceed { background: var(--ame-error); }
+    .ame-policy-marker {
+        position: absolute; top: -3px; width: 2px; height: 13px;
+        background: var(--ame-text);
+    }
+    .ame-policy-caption {
+        display: flex; justify-content: space-between;
+        font-family: var(--ame-mono); font-size: 0.66rem;
+        color: var(--ame-text-faint); margin-top: 5px;
+    }
+    .ame-policy-flag {
+        font-size: 0.78rem; font-weight: 600; margin-top: 8px;
+    }
+    .ame-policy-flag.ok { color: var(--ame-success); }
+    .ame-policy-flag.exceed { color: var(--ame-warning); }
+
+    /* ---------- Decision / why compact cards ---------- */
+    .ame-kv .k {
+        font-family: var(--ame-mono);
+        font-size: 0.66rem; letter-spacing: 0.06em;
+        color: var(--ame-text-faint); font-weight: 700;
+        margin-top: 9px;
+    }
+    .ame-kv .k:first-child { margin-top: 0; }
+    .ame-kv .v { font-size: 0.9rem; color: var(--ame-text); margin-bottom: 1px; }
+
+    .ame-why-list { margin: 2px 0 10px 0; padding: 0; list-style: none; }
+    .ame-why-list li {
+        font-size: 0.83rem; color: var(--ame-text-muted);
+        padding-left: 14px; position: relative; margin-bottom: 5px;
+    }
+    .ame-why-list li::before {
+        content: "â€¢"; position: absolute; left: 0; color: var(--ame-text-faint);
+    }
+    .ame-why-decision {
+        font-size: 0.85rem; color: var(--ame-text);
+        border-top: 1px solid var(--ame-border);
+        padding-top: 9px; margin-top: 4px;
+    }
+
+    /* ---------- Activity trace ---------- */
+    .ame-trace-ts {
+        font-family: var(--ame-mono); font-size: 0.66rem;
+        color: var(--ame-text-faint); margin-bottom: 8px; letter-spacing: 0.04em;
+    }
+    .ame-trace-line {
+        display: flex; gap: 9px; align-items: flex-start;
+        font-family: var(--ame-mono); font-size: 0.82rem;
+        line-height: 1.55; color: var(--ame-text-muted);
+        padding: 2px 0;
+    }
+    .ame-trace-icon { flex-shrink: 0; width: 13px; text-align: center; }
+    .ame-trace-icon.ok { color: var(--ame-success); }
+    .ame-trace-icon.warn { color: var(--ame-warning); }
+    .ame-trace-icon.bad { color: var(--ame-error); }
+    .ame-trace-icon.pending { color: var(--ame-text-faint); }
+    .ame-trace-text .event { color: var(--ame-text); font-weight: 600; margin-right: 6px; }
+
+    /* ---------- Payment ---------- */
+    .ame-payment-flow {
+        display: flex; align-items: center; gap: 10px;
+        font-family: var(--ame-mono); font-size: 0.72rem;
+        letter-spacing: 0.03em; color: var(--ame-text-muted);
+        margin-bottom: 12px;
+    }
+    a.ame-pay-btn {
+        display: inline-block;
+        background: var(--ame-text);
+        color: var(--ame-bg) !important;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.02em;
+        padding: 10px 18px;
+        border-radius: 6px;
+        text-decoration: none !important;
+    }
+    a.ame-pay-btn:hover { background: var(--ame-accent); color: #fff !important; }
+
+    /* ---------- Sidebar catalog ---------- */
+    .ame-cat-card {
+        border: 1px solid var(--ame-border);
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+    }
+    .ame-cat-card.active { border-color: var(--ame-accent); background: var(--ame-accent-dim); }
+    .ame-cat-name { font-size: 0.86rem; font-weight: 700; color: var(--ame-text); margin-bottom: 6px; }
+    .ame-cat-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
+    }
+    .ame-cat-grid .k { font-family: var(--ame-mono); font-size: 0.62rem; letter-spacing: 0.04em; color: var(--ame-text-faint); }
+    .ame-cat-grid .v { font-size: 0.78rem; color: var(--ame-text-muted); }
+
+    /* form widgets: quieten default streamlit look slightly */
+    .stButton > button, .stFormSubmitButton > button {
+        border-radius: 6px !important;
+        border: 1px solid var(--ame-border-2) !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.02em !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ============================================================================
+# FORMATTING HELPERS â€” pure presentation, no business logic duplicated here.
+# ============================================================================
+
+
+def fmt_inr(value):
+  if value is None:
+    return "â€”"
+  value = round(float(value), 2)
+  if value == int(value):
+    return f"â‚¹{int(value):,}"
+  return f"â‚¹{value:,.2f}"
+
+
+def fmt_pct(value):
+  if value is None:
+    return "â€”"
+  value = round(float(value), 2)
+  if value == int(value):
+    return f"{int(value)}%"
+  return f"{value:.2f}%"
+
+
+# ============================================================================
+# BACKEND STATUS â€” a real health check against the running FastAPI service.
+# Never assert "online" without checking; falls back honestly if unreachable.
+# ============================================================================
+
+
+def check_agent_online():
+  try:
+    r = requests.get(f"{BACKEND_URL}/", timeout=2)
+    return r.status_code == 200
+  except Exception:
+    return False
+
+
+agent_online = check_agent_online()
+
+# ============================================================================
+# HEADER
+# Built with st.columns rather than a single hand-rolled flex block, so it
+# uses the same layout primitive already proven reliable elsewhere in this
+# app (the buyer-request / transaction split below).
+# ============================================================================
+status_dot_cls = "online" if agent_online else "offline"
+status_text = "MERCHANT AGENT ONLINE" if agent_online else "MERCHANT AGENT UNREACHABLE"
+
+title_col, status_col = st.columns([3, 1])
+with title_col:
+  st.markdown('<p class="ame-header-title">A.M.E. // Agentic Merchant Engine</p>', unsafe_allow_html=True)
+  st.markdown('<p class="ame-header-sub">Real-Time Autonomous B2B Negotiation &amp; Dynamic Payment Gateway</p>', unsafe_allow_html=True)
+with status_col:
+  st.markdown(
+      f'<div class="ame-status-pill-row"><span class="ame-status-pill">'
+      f'<span class="ame-dot {status_dot_cls}"></span>{status_text}</span></div>',
+      unsafe_allow_html=True,
+  )
+st.markdown('<div class="ame-header-rule"></div>', unsafe_allow_html=True)
+
+# ============================================================================
+# TRANSACTION RAIL â€” reflects the ACTUAL state of the last transaction, not
+# a decorative stepper. Six stages map onto real backend checkpoints:
+#   REQUEST   -> payload received by this frontend
+#   VALIDATE  -> SKU found + inventory sufficient (backend's first checks)
+#   POLICY    -> discount compared against merchant's max_discount_pct
+#   NEGOTIATE -> ACCEPTED / COUNTER_OFFER decision computed
+#   PAYMENT   -> real Razorpay order created (razorpay_order_id present);
+#                "failed" if order creation itself errored (payment_error)
+#   ORDER     -> only marks "done" once a live /agent/payment-status check
+#                against Razorpay has actually returned status == "paid".
+#                Never inferred, never guessed.
+# ============================================================================
+STAGE_DEFS = [
+    ("REQUEST", "REQUEST"),
+    ("VALIDATE", "VALIDATE"),
+    ("POLICY", "POLICY"),
+    ("NEGOTIATE", "NEGOTIATE"),
+    ("PAYMENT", "PAYMENT"),
+    ("ORDER", "ORDER"),
+]
+
+
+def compute_stage_states(res_data, payment_status=None):
+  if res_data is None:
+    return {key: "future" for key, _ in STAGE_DEFS}
+  status = res_data.get("status")
+  states = {}
+  if status == "REJECTED":
+    states["REQUEST"] = "done"
+    states["VALIDATE"] = "failed"
+    for key, _ in STAGE_DEFS[2:]:
+      states[key] = "future"
+  else:
+    states["REQUEST"] = "done"
+    states["VALIDATE"] = "done"
+    states["POLICY"] = "done"
+    states["NEGOTIATE"] = "done"
+    if res_data.get("payment_error"):
+      states["PAYMENT"] = "failed"
+      states["ORDER"] = "future"
+    elif res_data.get("razorpay_order_id"):
+      states["PAYMENT"] = "done"
+      states["ORDER"] = "done" if payment_status == "paid" else "current"
+    else:
+      states["PAYMENT"] = "future"
+      states["ORDER"] = "future"
+  return states
+
+
+def render_rail(res_data, payment_status=None):
+  states = compute_stage_states(res_data, payment_status)
+  html = ['<div class="ame-rail">']
+  for i, (key, label) in enumerate(STAGE_DEFS):
+    state = states[key]
+    html.append(f'<div class="ame-rail-item is-{state}">')
+    html.append('<span class="ame-rail-dot"></span>')
+    html.append(f'<span class="ame-rail-label">{label}</span>')
+    html.append("</div>")
+    if i < len(STAGE_DEFS) - 1:
+      html.append('<span class="ame-rail-arrow">&#8594;</span>')
+  html.append("</div>")
+  st.markdown("".join(html), unsafe_allow_html=True)
+
+
+# Read the last live payment-status check once, up front, so the rail here
+# and every panel further down the page (badge, live deal, payment section)
+# all agree on the same real Razorpay state for this run.
+_payment_status_data = st.session_state.get("last_payment_status_data")
+_payment_status_error = st.session_state.get("last_payment_status_error")
+_payment_status = _payment_status_data.get("status") if _payment_status_data else None
+
+render_rail(st.session_state.get("last_response"), _payment_status)
+
+# ============================================================================
+# CATALOG FETCH â€” single shared fetch, reused by the sidebar and by every
+# calculation/display panel below. No duplicated network calls, no
+# duplicated business logic.
+# ============================================================================
+catalog_products = []
+catalog_error = None
+try:
+  cat_res = requests.get(f"{BACKEND_URL}/catalog", timeout=5)
+  if cat_res.status_code == 200:
+    cat_data = cat_res.json()
+    catalog_products = (
+        cat_data.get("products", []) if isinstance(cat_data, dict) else cat_data
+    )
+  else:
+    catalog_error = "Failed to load catalog from backend."
+except Exception as e:
+  catalog_error = f"Backend connection error: {e}"
+
+
+def get_product(sku):
+  return next((p for p in catalog_products if p.get("sku") == sku), None)
+
+
+# ============================================================================
+# SIDEBAR
+# ============================================================================
+page = st.sidebar.radio("Navigation", ["COMMAND CENTER", "BUYER AGENT", "MERCHANT", "TRANSACTIONS"])
+
+
+# ============================================================================
+# MAIN LAYOUT
+# ============================================================================
+
+if page == "COMMAND CENTER":
+    st.markdown('<div class="ame-panel-title">COMMAND CENTER</div>', unsafe_allow_html=True)
+    try:
+        tx_res = requests.get(f"{BACKEND_URL}/transactions", timeout=5)
+        if tx_res.status_code == 200:
+            tx_data = tx_res.json()
+            if isinstance(tx_data, dict) and "transactions" in tx_data:
+                txs = tx_data["transactions"]
+            elif isinstance(tx_data, list):
+                txs = tx_data
+            else:
+                txs = []
+            
+            total_gmv = sum(t.get("total_negotiated_price_inr", 0) for t in txs if t.get("status") in ["ACCEPTED", "COUNTER_OFFER"] and t.get("total_negotiated_price_inr"))
+            total_tx = len(txs)
+            
+            st.markdown(f'''
+            <div class="ame-panel">
+                <div class="ame-deal-row">
+                    <div class="ame-deal-item"><div class="k">TOTAL TRANSACTIONS</div><div class="v">{total_tx}</div></div>
+                    <div class="ame-deal-item"><div class="k">AGGREGATE GMV</div><div class="v">{fmt_inr(total_gmv)}</div></div>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        else:
+            st.error("Failed to fetch transactions.")
+    except Exception as e:
+        st.error(f"Error: {e}")
+
+elif page == "BUYER AGENT":
+    st.markdown('<div class="ame-panel-title">BUYER AGENT HERO</div>', unsafe_allow_html=True)
+    with st.form("intent_form"):
+        intent_query = st.text_input("What should I purchase?", "I want 5 units of SaaS PRO.")
+        intent_submitted = st.form_submit_button("PROCESS INTENT", use_container_width=True)
+        
+        if intent_submitted:
+            try:
+                # POST /agent/buyer/intent
+                intent_res = requests.post(f"{BACKEND_URL}/agent/buyer/intent", json={"query": intent_query}, timeout=15)
+                if intent_res.status_code == 200:
+                    intent_data = intent_res.json()
+                    st.success(f"Intent resolved: {intent_data}")
+                    # Map intent data to negotiate payload
+                    payload = {
+                        "sku": intent_data.get("sku", "SaaS-PRO-1M"),
+                        "requested_quantity": intent_data.get("requested_quantity", 1),
+                        "requested_discount_pct": intent_data.get("requested_discount_pct", 0.0),
+                    }
+                    st.session_state["last_payload"] = payload
+                    st.session_state["last_request_ts"] = datetime.now().strftime("%H:%M:%S")
+                    st.session_state["last_payment_status_data"] = None
+                    st.session_state["last_payment_status_error"] = None
+                    
+                    response = requests.post(f"{BACKEND_URL}/agent/negotiate", json=payload, timeout=15)
+                    st.session_state["last_response"] = response.json()
+                    st.session_state["_just_submitted"] = True
+                    st.rerun()
+                else:
+                    st.error("Failed to process intent.")
+            except Exception as e:
+                st.error(f"Error communicating with backend: {e}")
+                
+
+    
+    col1, col2 = st.columns(2, gap="large")
+    
+    with col1:
+      st.markdown('<div class="ame-panel-title">BUYER REQUEST</div>', unsafe_allow_html=True)
+      with st.form("negotiation_form"):
+        sku_input = st.text_input("Product SKU", "SaaS-PRO-1M", key="sku_input")
+        qty_input = st.number_input("Requested Quantity", min_value=1, value=5)
+        discount_input = st.slider(
+            "Requested Discount %", min_value=0.0, max_value=50.0, value=15.0
+        )
+        submitted = st.form_submit_button("EXECUTE REQUEST  â†’", use_container_width=True)
+    
+        if submitted:
+          # Field names precisely matched to backend's NegotiationRequest model.
+          payload = {
+              "sku": sku_input,
+              "requested_quantity": int(qty_input),
+              "requested_discount_pct": float(discount_input),
+          }
+          st.session_state["last_payload"] = payload
+          st.session_state["last_request_ts"] = datetime.now().strftime("%H:%M:%S")
+          st.session_state["last_payment_status_data"] = None
+          st.session_state["last_payment_status_error"] = None
+          try:
+            response = requests.post(
+                f"{BACKEND_URL}/agent/negotiate", json=payload, timeout=15
+            )
+            st.session_state["last_response"] = response.json()
+            st.session_state["_just_submitted"] = True
+          except Exception as e:
+            st.session_state["last_response"] = None
+            st.error(f"Error communicating with backend: {e}")
+    
+      # ---------- GUARDRAILS panel (display-only, no backend logic) ----------
+      _guard_product = get_product(sku_input)
+      if _guard_product is not None:
+        _gp_name = _guard_product.get("name", sku_input)
+        _gp_max_disc = _guard_product.get("max_discount_pct")
+        _gp_stock = _guard_product.get("stock")
+        st.markdown(
+            f"""
+            <div class="ame-panel">
+                <div class="ame-panel-title">GUARDRAILS &mdash; {_gp_name}</div>
+                <div class="ame-cat-grid">
+                    <div><span class="k">MAX DISCOUNT</span><br/><span class="v">{fmt_pct(_gp_max_disc)}</span></div>
+                    <div><span class="k" style="font-size:0.56rem;">(hard limit, not agent-decided)</span></div>
+                    <div><span class="k">STOCK AVAILABLE</span><br/><span class="v">{_gp_stock} units</span></div>
+                    <div></div>
+                    <div><span class="k">POLICY SOURCE</span><br/><span class="v">merchant catalog (catalog.json)</span></div>
+                    <div></div>
+                </div>
+                <p style="color:var(--ame-text-faint);font-size:0.72rem;margin:10px 0 0 0;line-height:1.45;">
+                    Negotiation logic is deterministic policy enforcement &mdash; discount bounds
+                    and inventory limits are hard-coded merchant rules, not LLM judgment.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    
+    # ============================================================================
+    # RIGHT COLUMN â€” every section below reads exclusively from
+    # st.session_state["last_response"] / ["last_payload"] / catalog_products.
+    # Nothing is hardcoded; sections are simply skipped when the backend hasn't
+    # returned data they depend on.
+    # ============================================================================
+    
+    STATUS_META = {
+        "ACCEPTED": ("ok", "OFFER APPROVED", "PAYMENT PENDING"),
+        "COUNTER_OFFER": ("warn", "COUNTER OFFER GENERATED", "PAYMENT PENDING"),
+        "REJECTED": ("bad", "REQUEST REJECTED", None),
+    }
+    
+    
+    def resolve_payment_badge(res_data, payment_status_data, payment_status_error):
+      """Single source of truth for real payment state, used by the status
+      badge, the live deal summary, and the payment section â€” so every part
+      of the UI agrees, and none of them ever show PAID without Razorpay
+      actually having confirmed it."""
+      if res_data.get("payment_error"):
+        return "bad", f"PAYMENT SETUP FAILED â€” {res_data['payment_error']}"
+      if payment_status_error:
+        return "warn", f"COULD NOT VERIFY STATUS â€” {payment_status_error}"
+      live_status = (payment_status_data or {}).get("status")
+      if live_status == "paid":
+        return "ok", "PAID â€” ORDER COMPLETE"
+      if live_status == "attempted":
+        return "warn", "PAYMENT ATTEMPTED â€” not yet confirmed"
+      if live_status == "created":
+        return "warn", "PAYMENT PENDING â€” order created, awaiting payment"
+      return "warn", "PAYMENT PENDING â€” check status to confirm"
+    
+    
+    def render_status_badge(res_data, payment_status_data=None, payment_status_error=None):
+      status = res_data.get("status")
+      cls, primary, secondary = STATUS_META.get(status, ("bad", status or "UNKNOWN", None))
+      if status in ("ACCEPTED", "COUNTER_OFFER"):
+        cls, secondary = resolve_payment_badge(res_data, payment_status_data, payment_status_error)
+      else:
+        secondary = secondary or res_data.get("reason", "")
+      st.markdown(
+          f"""
+          <div class="ame-status-badge {cls}">
+              <div class="primary">{primary}</div>
+              <div class="secondary">{secondary}</div>
+          </div>
+          """,
+          unsafe_allow_html=True,
+      )
+    
+    
+    def build_activity_lines(payload, res_data, product, payment_status_data=None):
+      """Pure data â€” no HTML. Returns list of (icon_cls, icon, event, detail)."""
+      status = res_data.get("status")
+      lines = [("ok", "&#10003;", "REQUEST", "Buyer request received")]
+    
+      if status == "REJECTED":
+        sku = payload.get("sku")
+        if product is None:
+          lines.append(("bad", "&#10007;", "VALIDATE", f"SKU not found â€” {sku}"))
+        else:
+          lines.append(("ok", "&#10003;", "VALIDATE", f"SKU validated â€” {sku}"))
+          lines.append(("bad", "&#10007;", "INVENTORY", res_data.get("reason", "Insufficient stock")))
+        lines.append(("pending", "&#9679;", "NEGOTIATE", "Halted â€” request rejected"))
+        return lines
+    
+      sku = payload.get("sku")
+      qty = payload.get("requested_quantity")
+      req_disc = payload.get("requested_discount_pct")
+      max_disc = product.get("max_discount_pct") if product else None
+      stock = product.get("stock") if product else None
+      base_price = product.get("base_price_inr") if product else None
+      unit_price = res_data.get("negotiated_unit_price")
+      total_price = res_data.get("total_negotiated_price_inr")
+    
+      lines.append(("ok", "&#10003;", "VALIDATE", f"SKU validated â€” {sku}"))
+      if stock is not None:
+        lines.append(("ok", "&#10003;", "INVENTORY", f"{stock} units available (requested {qty})"))
+      if base_price is not None:
+        lines.append(("ok", "&#10003;", "PRICING", f"Base price â€” {fmt_inr(base_price)}/unit"))
+      if max_disc is not None:
+        if req_disc is not None and req_disc > max_disc:
+          lines.append(("warn", "&#9888;", "POLICY", f"Requested {fmt_pct(req_disc)} exceeds max {fmt_pct(max_disc)}"))
+        else:
+          lines.append(("ok", "&#10003;", "POLICY", f"Requested {fmt_pct(req_disc)} within max {fmt_pct(max_disc)}"))
+    
+      if status == "COUNTER_OFFER":
+        lines.append(("ok", "&#10003;", "NEGOTIATE", f"Counter-offer generated â€” {fmt_inr(unit_price)}/unit"))
+      else:
+        lines.append(("ok", "&#10003;", "NEGOTIATE", f"Discount approved as requested â€” {fmt_inr(unit_price)}/unit"))
+    
+      if total_price is not None:
+        lines.append(("ok", "&#10003;", "TOTAL", f"Negotiated total â€” {fmt_inr(total_price)}"))
+    
+      if res_data.get("payment_error"):
+        lines.append(("bad", "&#10007;", "PAYMENT", f"Razorpay order creation failed â€” {res_data['payment_error']}"))
+      elif res_data.get("razorpay_order_id"):
+        lines.append(("ok", "&#10003;", "PAYMENT", f"Razorpay order created â€” {res_data['razorpay_order_id']}"))
+        live_status = (payment_status_data or {}).get("status")
+        if live_status == "paid":
+          lines.append(("ok", "&#10003;", "ORDER", "Razorpay confirmed payment â€” order complete"))
+        elif live_status == "attempted":
+          lines.append(("warn", "&#9888;", "ORDER", "Payment attempted â€” not yet confirmed by Razorpay"))
+        else:
+          lines.append(("pending", "&#9679;", "ORDER", "Awaiting buyer payment"))
+    
+      return lines
+    
+    
+    def _trace_html(lines, timestamp):
+      html = ['<div class="ame-panel">']
+      html.append('<div class="ame-panel-title">AGENT ACTIVITY</div>')
+      html.append(f'<div class="ame-trace-ts">TRANSACTION TIME â€” {timestamp}</div>')
+      for icon_cls, icon, event, detail in lines:
+        html.append(
+            f'<div class="ame-trace-line"><span class="ame-trace-icon'
+            f' {icon_cls}">{icon}</span><span class="ame-trace-text">'
+            f'<span class="event">{event}</span>{detail}</span></div>'
+        )
+      html.append("</div>")
+      return "".join(html)
+    
+    
+    def render_activity_trace(payload, res_data, product, payment_status_data=None, animate=False):
+      lines = build_activity_lines(payload, res_data, product, payment_status_data)
+      backend_ts = res_data.get("decision_timestamp") if res_data else None
+      if backend_ts:
+        timestamp = backend_ts
+      else:
+        timestamp = st.session_state.get("last_request_ts", datetime.now().strftime("%H:%M:%S"))
+      placeholder = st.empty()
+      if animate:
+        for i in range(1, len(lines) + 1):
+          placeholder.markdown(_trace_html(lines[:i], timestamp), unsafe_allow_html=True)
+          time.sleep(0.12)
+      else:
+        placeholder.markdown(_trace_html(lines, timestamp), unsafe_allow_html=True)
+    
+    
+    def render_live_deal_summary(payload, res_data, product, payment_status_data=None, payment_status_error=None):
+      if product is None:
+        return
+      qty = payload.get("requested_quantity", 0)
+      base_price = product.get("base_price_inr", 0)
+      original_value = base_price * qty
+      total_price = res_data.get("total_negotiated_price_inr")
+      if total_price is None:
+        return
+      savings = round(original_value - total_price, 2)
+      status = res_data.get("status")
+      if status in ("ACCEPTED", "COUNTER_OFFER"):
+        _, secondary_label = resolve_payment_badge(res_data, payment_status_data, payment_status_error)
+        primary_label = secondary_label
+      else:
+        _, primary_label, secondary_label = STATUS_META.get(status, ("", status, ""))
+    
+      html = '<div class="ame-panel"><div class="ame-panel-title">LIVE DEAL</div>'
+      html += '<div class="ame-deal-row">'
+      html += f'<div class="ame-deal-item"><div class="k">{product.get("name", payload.get("sku"))}</div><div class="v" style="font-size:0.8rem;font-weight:500;color:var(--ame-text-muted);">{qty} unit(s)</div></div>'
+      html += f'<div class="ame-deal-item"><div class="k">ORIGINAL</div><div class="v strike">{fmt_inr(original_value)}</div></div>'
+      html += '<div class="ame-deal-arrow">&#8594;</div>'
+      html += f'<div class="ame-deal-item"><div class="k">NEGOTIATED</div><div class="v">{fmt_inr(total_price)}</div></div>'
+      if savings > 0:
+        html += f'<div class="ame-deal-item"><div class="k">SAVINGS</div><div class="v save">{fmt_inr(savings)}</div></div>'
+      html += f'<div class="ame-deal-item"><div class="k">STATUS</div><div class="v" style="font-size:0.78rem;">{secondary_label or primary_label}</div></div>'
+      html += "</div></div>"
+      st.markdown(html, unsafe_allow_html=True)
+    
+    
+    def render_negotiation_hero(payload, res_data, product):
+      if product is None:
+        return
+      req_disc = payload.get("requested_discount_pct")
+      max_disc = product.get("max_discount_pct")
+      granted_disc = res_data.get("discount_granted_pct")
+      unit_price = res_data.get("negotiated_unit_price")
+      total_price = res_data.get("total_negotiated_price_inr")
+      status = res_data.get("status")
+      exceeds = req_disc is not None and max_disc is not None and req_disc > max_disc
+    
+      html = '<div class="ame-panel"><div class="ame-panel-title">NEGOTIATION</div>'
+      html += (
+          '<div class="ame-nego-row"><span class="ame-nego-label">BUYER'
+          f' REQUEST</span><span class="ame-nego-value">{fmt_pct(req_disc)}'
+          " discount</span></div>"
+      )
+      html += (
+          '<div class="ame-nego-row"><span class="ame-nego-label">MERCHANT'
+          ' POLICY</span><span class="ame-nego-value">Max allowed â€”'
+          f" {fmt_pct(max_disc)}</span></div>"
+      )
+    
+      # Policy bar â€” scaled against the slider's own 0-50% range so it always
+      # reads consistently regardless of which product/limit is active.
+      scale = 50.0
+      req_pct_width = min(max((req_disc or 0) / scale * 100, 0), 100)
+      marker_pct = min(max((max_disc or 0) / scale * 100, 0), 100)
+      bar_cls = "exceed" if exceeds else "ok"
+      html += '<div class="ame-policy-bar-wrap">'
+      html += '<div class="ame-policy-bar-track">'
+      html += f'<div class="ame-policy-bar-fill {bar_cls}" style="width:{req_pct_width:.1f}%;"></div>'
+      html += f'<div class="ame-policy-marker" style="left:{marker_pct:.1f}%;"></div>'
+      html += "</div>"
+      html += (
+          f'<div class="ame-policy-caption"><span>REQUESTED {fmt_pct(req_disc)}</span>'
+          f'<span>POLICY LIMIT {fmt_pct(max_disc)}</span></div>'
+      )
+      if exceeds:
+        html += '<div class="ame-policy-flag exceed">&#9888; POLICY LIMIT EXCEEDED â€” capped at max</div>'
+      else:
+        html += '<div class="ame-policy-flag ok">&#10003; WITHIN POLICY LIMIT</div>'
+      html += "</div>"
+    
+      decision_label = "COUNTER OFFER" if status == "COUNTER_OFFER" else "REQUEST APPROVED"
+      decision_cls = "warn" if status == "COUNTER_OFFER" else "ok"
+      html += (
+          '<div class="ame-nego-row" style="margin-top:6px;"><span class="ame-nego-label">MERCHANT'
+          f' AGENT DECISION</span><span class="ame-nego-value {decision_cls}">'
+          f"{decision_label} â€” {fmt_pct(granted_disc)} discount</span></div>"
+      )
+      html += (
+          '<div class="ame-nego-final"><div><div class="label">FINAL PRICE</div>'
+          f'<div class="price">{fmt_inr(unit_price)} <span style="font-size:0.95rem;font-weight:500;color:var(--ame-text-muted);">/ unit</span></div>'
+          f'<div class="total">{fmt_inr(total_price)} total</div></div></div>'
+      )
+      html += "</div>"
+      st.markdown(html, unsafe_allow_html=True)
+    
+    
+    def render_decision_and_why(payload, res_data, product):
+      status = res_data.get("status")
+      d_col, w_col = st.columns(2)
+    
+      with d_col:
+        html = '<div class="ame-panel"><div class="ame-panel-title">MERCHANT AGENT DECISION</div><div class="ame-kv">'
+        html += f'<div class="k">DECISION</div><div class="v">{"COUNTER OFFER" if status == "COUNTER_OFFER" else "REQUEST APPROVED"}</div>'
+        html += f'<div class="k">DISCOUNT GRANTED</div><div class="v">{fmt_pct(res_data.get("discount_granted_pct"))}</div>'
+        html += f'<div class="k">UNIT PRICE</div><div class="v">{fmt_inr(res_data.get("negotiated_unit_price"))}</div>'
+        html += f'<div class="k">TOTAL</div><div class="v">{fmt_inr(res_data.get("total_negotiated_price_inr"))}</div>'
+        html += f'<div class="k">REASON</div><div class="v" style="color:var(--ame-text-muted);font-size:0.83rem;">{res_data.get("reason", "â€”")}</div>'
+        html += f'<div class="k">POLICY VERSION</div><div class="v" style="color:var(--ame-text-muted);font-size:0.83rem;">{res_data.get("policy_version", "â€”")}</div>'
+        html += "</div></div>"
+        st.markdown(html, unsafe_allow_html=True)
+    
+      with w_col:
+        if product is None:
+          return
+        req_disc = payload.get("requested_discount_pct")
+        max_disc = product.get("max_discount_pct")
+        stock = product.get("stock")
+        qty = payload.get("requested_quantity")
+        base_price = product.get("base_price_inr")
+    
+        html = '<div class="ame-panel"><div class="ame-panel-title">WHY THIS DECISION?</div>'
+        html += '<ul class="ame-why-list">'
+        html += f"<li>Requested discount: {fmt_pct(req_disc)}</li>"
+        html += f"<li>Maximum permitted: {fmt_pct(max_disc)}</li>"
+        html += f"<li>Requested quantity: {qty}</li>"
+        html += f"<li>Inventory available: {stock}</li>"
+        html += f"<li>Base price: {fmt_inr(base_price)}</li>"
+        html += "</ul>"
+        html += f'<div class="ame-why-decision">{res_data.get("reason", "â€”")}</div>'
+        html += "</div>"
+        st.markdown(html, unsafe_allow_html=True)
+    
+    
+    def render_payment_section(res_data, payment_status_data=None, payment_status_error=None):
+      payment_error = res_data.get("payment_error")
+      order_id = res_data.get("razorpay_order_id")
+    
+      # Order creation itself failed â€” fail visibly, no fallback link of any kind.
+      if payment_error:
+        st.markdown(
+            '<div class="ame-payment-flow">'
+            '<span style="color:var(--ame-success);">&#10003; NEGOTIATION COMPLETE</span>'
+            "<span>&#8594;</span>"
+            '<span style="color:var(--ame-error);">PAYMENT SETUP FAILED</span>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.error(f"Could not create a Razorpay order: {payment_error}")
+        return
+    
+      if not order_id:
+        return
+    
+      _, flow_label = resolve_payment_badge(res_data, payment_status_data, payment_status_error)
+      live_status = (payment_status_data or {}).get("status")
+      flow_color = "var(--ame-success)" if live_status == "paid" else "var(--ame-warning)"
+    
+      st.markdown(
+          '<div class="ame-payment-flow">'
+          '<span style="color:var(--ame-success);">&#10003; NEGOTIATION COMPLETE</span>'
+          "<span>&#8594;</span>"
+          f'<span style="color:{flow_color};">{flow_label}</span>'
+          "</div>",
+          unsafe_allow_html=True,
+      )
+    
+      # Only offer Checkout while there's actually something left to pay.
+      if live_status != "paid":
+        key_id = res_data.get("razorpay_key_id") or ""
+        amount_paise = res_data.get("amount_paise") or 0
+        checkout_html = f"""
+        <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+          <button id="rzp-btn-{order_id}" style="
+              background:#F5F5F4; color:#0A0A0B; font-weight:700; font-size:13px;
+              letter-spacing:0.02em; padding:10px 18px; border:none;
+              border-radius:6px; cursor:pointer;">
+            PAY VIA RAZORPAY &#8594;
+          </button>
+          <div id="rzp-result-{order_id}" style="margin-top:8px; font-family:'SFMono-Regular',Consolas,monospace; font-size:12px; color:#9A9AA0;"></div>
+          <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+          <script>
+            (function() {{
+              var resetIframe = function() {{
+                if (window.frameElement) {{
+                  window.frameElement.style.position = 'static';
+                  window.frameElement.style.width = '100%';
+                  window.frameElement.style.height = '110px';
+                  window.frameElement.style.zIndex = 'auto';
+                }}
+              }};
+    
+              var options = {{
+                "key": "{key_id}",
+                "amount": "{amount_paise}",
+                "currency": "INR",
+                "name": "A.M.E. Merchant",
+                "description": "Order {order_id}",
+                "order_id": "{order_id}",
+                "handler": function (response) {{
+                  resetIframe();
+                  document.getElementById("rzp-result-{order_id}").innerText =
+                    "Submitted â€” payment_id " + response.razorpay_payment_id +
+                    ". Click CHECK PAYMENT STATUS below to confirm.";
+                }},
+                "modal": {{
+                  "ondismiss": function () {{
+                    resetIframe();
+                    document.getElementById("rzp-result-{order_id}").innerText =
+                      "Checkout closed without completing payment.";
+                  }}
+                }},
+                "theme": {{ "color": "#5C7CFA" }}
+              }};
+              var rzp = new Razorpay(options);
+              rzp.on("payment.failed", function (response) {{
+                resetIframe();
+                document.getElementById("rzp-result-{order_id}").innerText =
+                  "Payment failed: " + response.error.description;
+              }});
+              document.getElementById("rzp-btn-{order_id}").onclick = function (e) {{
+                e.preventDefault();
+                if (window.frameElement) {{
+                  window.frameElement.style.position = 'fixed';
+                  window.frameElement.style.top = '0';
+                  window.frameElement.style.left = '0';
+                  window.frameElement.style.width = '100vw';
+                  window.frameElement.style.height = '100vh';
+                  window.frameElement.style.zIndex = '999999';
+                }}
+                rzp.open();
+              }};
+            }})();
+          </script>
+        </div>
+        """
+        components.html(checkout_html, height=110)
+    
+      if st.button("CHECK PAYMENT STATUS", key=f"check_status_{order_id}"):
+        try:
+          status_resp = requests.get(
+              f"{BACKEND_URL}/agent/payment-status/{order_id}", timeout=10
+          )
+          if status_resp.status_code == 200:
+            st.session_state["last_payment_status_data"] = status_resp.json()
+            st.session_state["last_payment_status_error"] = None
+          else:
+            st.session_state["last_payment_status_data"] = None
+            try:
+              detail = status_resp.json().get("detail", status_resp.text)
+            except Exception:
+              detail = status_resp.text
+            st.session_state["last_payment_status_error"] = detail
+        except Exception as e:
+          st.session_state["last_payment_status_data"] = None
+          st.session_state["last_payment_status_error"] = f"Backend connection error: {e}"
+        st.rerun()
+    
+      if payment_status_error:
+        st.error(f"Could not verify payment status: {payment_status_error}")
+      elif payment_status_data:
+        amount_paid_inr = (payment_status_data.get("amount_paid") or 0) / 100
+        st.caption(
+            f"Last checked â€” Razorpay order status: `{payment_status_data.get('status')}` "
+            f"Â· amount paid: {fmt_inr(amount_paid_inr)}"
+        )
+    
+    
+    with col2:
+      st.markdown('<div class="ame-panel-title">MERCHANT AGENT / TRANSACTION</div>', unsafe_allow_html=True)
+    
+      if st.session_state.get("last_response") is None:
+        st.markdown(
+            '<div class="ame-panel" style="color:var(--ame-text-muted);font-size:0.88rem;">'
+            "Awaiting buyer agent transmission. Submit a request on the left to"
+            " start negotiation.</div>",
+            unsafe_allow_html=True,
+        )
+      else:
+        res_data = st.session_state["last_response"]
+        payload = st.session_state.get("last_payload", {})
+        product = get_product(payload.get("sku"))
+        status = res_data.get("status")
+        animate = st.session_state.get("_just_submitted", False)
+    
+        render_status_badge(res_data, _payment_status_data, _payment_status_error)
+    
+        if status in ("ACCEPTED", "COUNTER_OFFER"):
+          render_live_deal_summary(payload, res_data, product, _payment_status_data, _payment_status_error)
+          render_negotiation_hero(payload, res_data, product)
+    
+        render_activity_trace(payload, res_data, product, payment_status_data=_payment_status_data, animate=animate)
+        st.session_state["_just_submitted"] = False
+    
+        if status in ("ACCEPTED", "COUNTER_OFFER"):
+          render_decision_and_why(payload, res_data, product)
+    
+          cross_sell = res_data.get("cross_sell")
+          if cross_sell:
+            cs_name = cross_sell.get("name", "")
+            cs_base = cross_sell.get("base_price_inr")
+            cs_price = cross_sell.get("offered_price_inr")
+            cs_disc = cross_sell.get("offered_discount_pct")
+            cs_html = '<div class="ame-panel"><div class="ame-panel-title">SUGGESTED ADD-ON</div><div class="ame-kv">'
+            cs_html += f'<div class="k">PRODUCT</div><div class="v">{cs_name}</div>'
+            cs_html += f'<div class="k">BASE PRICE</div><div class="v" style="text-decoration:line-through;color:var(--ame-text-faint);">{fmt_inr(cs_base)}</div>'
+            cs_html += f'<div class="k">OFFERED PRICE</div><div class="v" style="color:var(--ame-success);">{fmt_inr(cs_price)}</div>'
+            cs_html += f'<div class="k">NOTE</div><div class="v" style="color:var(--ame-text-muted);font-size:0.83rem;">Offered at your negotiated rate ({fmt_pct(cs_disc)} off)</div>'
+            cs_html += '</div></div>'
+            st.markdown(cs_html, unsafe_allow_html=True)
+    
+        with st.expander("AUDIT TRAIL â€” raw event payload"):
+          st.caption("Human-readable trace above Â· raw backend response below")
+          st.json(res_data)
+          if _payment_status_data:
+            st.caption("Latest payment status check (raw Razorpay order fetch):")
+            st.json(_payment_status_data)
+    
+        if status in ("ACCEPTED", "COUNTER_OFFER"):
+          render_payment_section(res_data, _payment_status_data, _payment_status_error)
+    
+
+elif page == "MERCHANT":
+    st.markdown(
+        '<div class="ame-panel-title" style="margin-bottom:14px;">MERCHANT'
+        " CATALOG &amp; RULES</div>",
+        unsafe_allow_html=True,
+    )
+    if catalog_error:
+        st.error(catalog_error)
+    else:
+        active_sku = st.session_state.get("sku_input")
+        for p in catalog_products:
+            sku = p.get("sku", "N/A")
+            name = p.get("name", sku)
+            is_active = sku == active_sku
+            card_cls = "ame-cat-card active" if is_active else "ame-cat-card"
+            st.markdown(
+                f"""
+                <div class="{card_cls}">
+                    <div class="ame-cat-name">{name}</div>
+                    <div class="ame-cat-grid">
+                        <div><span class="k">SKU</span><br/><span class="v">{sku}</span></div>
+                        <div><span class="k">BASE PRICE</span><br/><span class="v">{fmt_inr(p.get('base_price_inr'))}</span></div>
+                        <div><span class="k">STOCK</span><br/><span class="v">{p.get('stock')} units</span></div>
+                        <div><span class="k">MAX DISCOUNT</span><br/><span class="v">{fmt_pct(p.get('max_discount_pct'))}</span></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+elif page == "TRANSACTIONS":
+    st.markdown('<div class="ame-panel-title">TRANSACTION HISTORY</div>', unsafe_allow_html=True)
+    try:
+        tx_res = requests.get(f"{BACKEND_URL}/transactions", timeout=5)
+        if tx_res.status_code == 200:
+            tx_data = tx_res.json()
+            if isinstance(tx_data, dict) and "transactions" in tx_data:
+                txs = tx_data["transactions"]
+            elif isinstance(tx_data, list):
+                txs = tx_data
+            else:
+                txs = []
+            st.dataframe(txs)
+        else:
+            st.error("Failed to fetch transactions.")
+    except Exception as e:
+        st.error(f"Error: {e}")

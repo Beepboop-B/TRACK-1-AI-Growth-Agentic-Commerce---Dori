@@ -1,0 +1,42 @@
+{
+  "products": [
+    {
+      "sku": "SaaS-PRO-1M",
+      "name": "Pro License (1 Month)",
+      "base_price_inr": 2000,
+      "max_discount_pct": 10,
+      "stock": 500,
+      "cross_sell_sku": "API-CRED-10K"
+    },
+    {
+      "sku": "SaaS-PRO-1Y",
+      "name": "Pro License (1 Year)",
+      "base_price_inr": 20000,
+      "max_discount_pct": 25,
+      "stock": 100,
+      "cross_sell_sku": "HW-TERMINAL-X"
+    },
+    {
+      "sku": "API-CRED-10K",
+      "name": "10,000 API Credits",
+      "base_price_inr": 5000,
+      "max_discount_pct": 5,
+      "stock": 10000
+    },
+    {
+      "sku": "HW-TERMINAL-X",
+      "name": "Smart PoS Terminal",
+      "base_price_inr": 15000,
+      "max_discount_pct": 15,
+      "stock": 50,
+      "cross_sell_sku": "CONSULT-1HR"
+    },
+    {
+      "sku": "CONSULT-1HR",
+      "name": "1 Hour Setup Consultation",
+      "base_price_inr": 8000,
+      "max_discount_pct": 0,
+      "stock": 10
+    }
+  ]
+}
