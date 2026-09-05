@@ -365,26 +365,41 @@ export default function BuyerAgent() {
                   <div className="text-sm">A.M.E. prepared the transaction, but merchant authorization was not granted. Transaction not charged.</div>
                 </div>
               ) : merchantAuth === 'PHONE_PENDING' ? (
-                <div className={`${cardCls} mb-6 border-l-4 ${isDark ? 'border-l-amber' : 'border-l-lightAmber'}`}>
-                  <div className={hdrCls}>📱 WAITING FOR MERCHANT</div>
-                  <div className={`text-sm mb-4 ${isDark ? 'text-darkText2' : 'text-lightText2'}`}>Approval request sent to phone.</div>
-                  <Row k="PRODUCT" v={`${qty} × ${prod?.name || payload?.sku}`} />
-                  <Row k="TRANSACTION VALUE" v={fmtInr(negTotal)} />
-                  <div className="my-4 border-t border-dashed opacity-20"></div>
-                  
-                  <div className="text-center mb-4">
-                    <div className="inline-block p-4 bg-white rounded-lg mb-2">
-                      <div className="w-32 h-32 flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 text-xs text-center p-2">
-                        PHONE APPROVAL AVAILABLE IN DEPLOYED VERSION
+                  <div className={`${cardCls} mb-6 border-l-4 ${isDark ? 'border-l-amber' : 'border-l-lightAmber'}`}>
+                    <div className={hdrCls}>📱 WAITING FOR MERCHANT</div>
+                    <Row k="PRODUCT" v={`${qty} x ${prod?.name || payload?.sku}`} />
+                    <Row k="TRANSACTION VALUE" v={fmtInr(negTotal)} />
+                    <div className="my-4 border-t border-dashed opacity-20"></div>
+                    
+                    {emailStatus === 'SENDING' && (
+                      <div className="p-3 mb-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 text-sm font-semibold text-center tracking-wider">
+                        SENDING APPROVAL EMAIL...
+                      </div>
+                    )}
+                    {emailStatus === 'SENT' && (
+                      <div className="p-4 mb-4 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
+                        <div className="text-green-500 font-bold mb-2">EMAIL SENT ✓</div>
+                        <div className={`text-sm ${isDark ? 'text-darkText2' : 'text-lightText2'}`}>
+                          Approval link sent to <strong>{localStorage.getItem('merchantEmail')}</strong>
+                          <br/><br/>
+                          Check your inbox or spam folder to authorize this transaction.
+                        </div>
+                      </div>
+                    )}
+                    {emailStatus === 'FAILED' && (
+                      <div className="p-3 mb-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-semibold text-center">
+                        EMAIL FAILED TO SEND.
+                      </div>
+                    )}
+
+                    <div className="text-center mb-4">
+                      <div className={`text-xs ${isDark ? 'text-darkText3' : 'text-lightText3'}`}>
+                        <a href={`/approval/${response.transaction_id}`} target="_blank" rel="noreferrer" className="underline hover:text-amber">Open dev approval link (fallback)</a>
                       </div>
                     </div>
-                    <div className={`text-xs ${isDark ? 'text-darkText3' : 'text-lightText3'}`}>
-                      <a href={`/approval/${response.transaction_id}`} target="_blank" rel="noreferrer" className="underline hover:text-amber">Open dev approval link</a>
-                    </div>
+                    
+                    <button onClick={() => { setMerchantAuth(null); setEmailStatus(null); }} className={`w-full py-2.5 rounded-xl font-bold border transition-transform hover:-translate-y-0.5 ${isDark ? 'border-darkBorder hover:bg-darkSurfaceEl text-darkText1' : 'border-lightBorder hover:bg-lightSurfaceEl text-lightText1'}`}>CANCEL</button>
                   </div>
-                  
-                  <button onClick={() => setMerchantAuth(null)} className={`w-full py-2.5 rounded-xl font-bold border transition-transform hover:-translate-y-0.5 ${isDark ? 'border-darkBorder hover:bg-darkSurfaceEl text-darkText1' : 'border-lightBorder hover:bg-lightSurfaceEl text-lightText1'}`}>CANCEL</button>
-                </div>
               ) : !merchantAuth && response?.razorpay_order_id ? (
                 <div className={`${cardCls} mb-6 border-l-4 ${isDark ? 'border-l-amber' : 'border-l-lightAmber'}`}>
                   <div className={hdrCls}>MERCHANT AUTHORIZATION REQUIRED</div>
