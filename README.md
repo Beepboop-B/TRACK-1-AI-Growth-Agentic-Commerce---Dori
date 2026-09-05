@@ -34,3 +34,5 @@ Please refer to `SETUP.md` for exact Windows installation instructions.
 ## Known Limitations
 - Data persistence uses local `.json` instead of a full Postgres/Redis cluster to keep the demo lightweight.
 - OpenAI is used for intent extraction, but a deterministic heuristic fallback is included if the key is missing.
+
+NOTE: I had like 10 hours to make this for the buildathon and on no sleep , got to know about this on the last day lmao. But vibecoding and not vibecoding and some enrgy drinks helped to make this little something and if the assessor is reading this , I'll be worth it , you won't regret . Trust . 
